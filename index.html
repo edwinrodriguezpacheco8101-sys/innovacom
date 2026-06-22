@@ -114,8 +114,28 @@
 
 <div id="sidebar">
   <div class="brand">
-    <div class="brand-sub">TallerPC</div>
-    <div class="brand-name">Mi Taller</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px">
+      <svg width="32" height="32" viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg">
+        <rect x="8" y="4" width="60" height="46" rx="5" fill="none" stroke="#1d4ed8" stroke-width="5"/>
+        <polygon points="8,4 30,4 20,10 8,10" fill="#f97316"/>
+        <line x1="18" y1="20" x2="42" y2="20" stroke="#f97316" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="44" cy="20" r="4" fill="#f97316"/>
+        <line x1="18" y1="32" x2="50" y2="32" stroke="#f97316" stroke-width="4" stroke-linecap="round"/>
+        <circle cx="52" cy="32" r="4" fill="#1d4ed8"/>
+        <line x1="44" y1="20" x2="52" y2="32" stroke="#475569" stroke-width="3"/>
+        <circle cx="60" cy="24" r="4" fill="#475569"/>
+        <circle cx="60" cy="36" r="4" fill="#475569"/>
+        <line x1="52" y1="32" x2="60" y2="24" stroke="#475569" stroke-width="2.5"/>
+        <line x1="52" y1="32" x2="60" y2="36" stroke="#475569" stroke-width="2.5"/>
+        <rect x="20" y="50" width="36" height="5" rx="2" fill="#1d4ed8"/>
+        <rect x="10" y="55" width="56" height="5" rx="2" fill="#1d4ed8"/>
+        <ellipse cx="38" cy="65" rx="22" ry="4" fill="#94a3b822"/>
+      </svg>
+      <div>
+        <div class="brand-sub" style="color:#f97316">TALLER</div>
+        <div class="brand-name" style="font-size:16px"><span style="color:#f97316">Innova</span><span style="color:#93c5fd">com</span></div>
+      </div>
+    </div>
   </div>
   <nav>
     <button class="nav-btn active" onclick="showTab('dashboard')" id="nav-dashboard">&#9889; Dashboard</button>
@@ -589,20 +609,26 @@ function guardarOrden(){
   ordenes.push(orden);saveOrdenes();
   closeModal('modal-orden');renderOrdenes();renderClientes();updateFooter();
   // WA
+  // Guardar orden actual para PDF
+  window._ultimaOrden = orden;
+
   var cWA=clientes.find(function(x){return x.id===clienteId;});
   var tel=cWA&&cWA.telefono?cWA.telefono.replace(/\D/g,'').replace(/^0/,''):'';
+  var repLinea=presItems.length?'\nRepuestos:\n'+presItems.map(function(p){return '  - '+p.nombre+' x'+p.qty+' = '+fmt(p.precio*p.qty);}).join('\n'):'';
+  var lineas=['Hola '+cWA.nombre+' !','','Hemos recibido tu equipo en nuestro taller.','',
+    'Folio: '+orden.id,'Equipo: '+orden.equipo+(orden.marca?' '+orden.marca:'')+(orden.modelo?' '+orden.modelo:''),
+    'Falla: '+(orden.falla||'-'),'Fecha: '+orden.fecha,repLinea,
+    'Costo total: '+(orden.costo?fmt(orden.costo):'Por definir'),'','Gracias por tu confianza!'];
+  var msg=encodeURIComponent(lineas.join('\n'));
+  document.getElementById('acc-folio').textContent=orden.id;
+  document.getElementById('acc-nombre').textContent=cWA.nombre;
   if(tel){
-    var repLinea=presItems.length?'\nRepuestos:\n'+presItems.map(function(p){return '  - '+p.nombre+' x'+p.qty+' = '+fmt(p.precio*p.qty);}).join('\n'):'';
-    var lineas=['Hola '+cWA.nombre+' !','','Hemos recibido tu equipo en nuestro taller.','',
-      'Folio: '+orden.id,'Equipo: '+orden.equipo+(orden.marca?' '+orden.marca:'')+(orden.modelo?' '+orden.modelo:''),
-      'Falla: '+(orden.falla||'-'),'Fecha: '+orden.fecha,repLinea,
-      'Costo total: '+(orden.costo?fmt(orden.costo):'Por definir'),'','Gracias por tu confianza!'];
-    var msg=encodeURIComponent(lineas.join('\n'));
-    document.getElementById('wa-folio').textContent=orden.id;
-    document.getElementById('wa-nombre').textContent=cWA.nombre;
     document.getElementById('wa-link').href='https://wa.me/593'+tel+'?text='+msg;
-    document.getElementById('modal-wa').classList.remove('hidden');
+    document.getElementById('wa-link').style.display='flex';
+  } else {
+    document.getElementById('wa-link').style.display='none';
   }
+  document.getElementById('modal-acciones').classList.remove('hidden');
 }
 
 // ── INVENTARIO ────────────────────────────────
@@ -684,6 +710,105 @@ function eliminarRepuesto(id){
   if(!confirm('Eliminar este repuesto del inventario?'))return;
   repuestos=repuestos.filter(function(r){return r.id!==id;});
   saveRepuestos();renderInventario();
+}
+
+// ── PDF ───────────────────────────────────────
+function imprimirOrdenPDF(){
+  var o=window._ultimaOrden;
+  if(!o)return;
+  var c=clientes.find(function(x){return x.id===o.clienteId;});
+  var saldo=(parseFloat(o.costo)||0)-(parseFloat(o.anticipo)||0);
+  var repTabla='';
+  if(o.repuestos&&o.repuestos.length){
+    repTabla='<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:12px">'+
+      '<thead><tr style="background:#f1f5f9"><th style="padding:6px 8px;text-align:left;border:1px solid #e2e8f0">Repuesto</th><th style="padding:6px 8px;text-align:center;border:1px solid #e2e8f0">Cant.</th><th style="padding:6px 8px;text-align:right;border:1px solid #e2e8f0">P. Unit.</th><th style="padding:6px 8px;text-align:right;border:1px solid #e2e8f0">Subtotal</th></tr></thead><tbody>'+
+      o.repuestos.map(function(p){
+        return '<tr><td style="padding:5px 8px;border:1px solid #e2e8f0">'+p.nombre+'</td><td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:center">'+p.qty+'</td><td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:right">'+fmt(p.precio)+'</td><td style="padding:5px 8px;border:1px solid #e2e8f0;text-align:right;font-weight:700">'+fmt(p.precio*p.qty)+'</td></tr>';
+      }).join('')+
+      '</tbody></table>';
+  }
+  var html='<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Orden '+o.id+'</title>'+
+    '<style>body{font-family:Arial,sans-serif;color:#1e293b;padding:32px;max-width:700px;margin:auto}'+
+    'h1{font-size:22px;margin:0}h2{font-size:13px;color:#64748b;margin:0 0 4px}'+
+    '.header{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0ea5e9;padding-bottom:16px;margin-bottom:20px}'+
+    '.folio{background:#0ea5e9;color:#fff;padding:8px 18px;border-radius:8px;font-size:18px;font-weight:700}'+
+    '.section{margin-bottom:16px}.section-title{font-size:11px;font-weight:700;color:#0ea5e9;letter-spacing:1px;text-transform:uppercase;border-bottom:1px solid #e2e8f0;padding-bottom:4px;margin-bottom:10px}'+
+    '.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.field-lbl{font-size:10px;color:#94a3b8;text-transform:uppercase;letter-spacing:1px}.field-val{font-size:13px;font-weight:600;color:#1e293b;margin-top:2px}'+
+    '.falla-box{background:#f8fafc;border:1px solid #e2e8f0;border-radius:6px;padding:10px 14px;font-size:13px;white-space:pre-wrap}'+
+    '.totales{margin-top:12px;border-top:1px solid #e2e8f0;padding-top:10px}'+
+    '.tot-row{display:flex;justify-content:space-between;font-size:13px;padding:3px 0}'+
+    '.tot-total{font-size:16px;font-weight:700;color:#0ea5e9;border-top:2px solid #0ea5e9;padding-top:6px;margin-top:4px}'+
+    '.firma{margin-top:32px;display:grid;grid-template-columns:1fr 1fr;gap:40px}'+
+    '.firma-line{border-top:1px solid #1e293b;padding-top:6px;font-size:11px;color:#64748b;text-align:center;margin-top:40px}'+
+    '.estado-badge{display:inline-block;padding:3px 12px;border-radius:20px;font-size:12px;font-weight:700;background:#fef3c7;color:#d97706;border:1px solid #fde68a}'+
+    'table th,table td{font-size:12px}@media print{body{padding:16px}}</style></head><body>'+
+    '<div class="header">'+
+      '<div style="display:flex;align-items:center;gap:14px">'+
+        '<svg width="52" height="44" viewBox="0 0 100 80" xmlns="http://www.w3.org/2000/svg">'+
+          '<rect x="8" y="4" width="60" height="46" rx="5" fill="none" stroke="#1d4ed8" stroke-width="5"/>'+
+          '<polygon points="8,4 30,4 20,10 8,10" fill="#f97316"/>'+
+          '<line x1="18" y1="20" x2="42" y2="20" stroke="#f97316" stroke-width="4" stroke-linecap="round"/>'+
+          '<circle cx="44" cy="20" r="4" fill="#f97316"/>'+
+          '<line x1="18" y1="32" x2="50" y2="32" stroke="#f97316" stroke-width="4" stroke-linecap="round"/>'+
+          '<circle cx="52" cy="32" r="4" fill="#1d4ed8"/>'+
+          '<line x1="44" y1="20" x2="52" y2="32" stroke="#475569" stroke-width="3"/>'+
+          '<circle cx="60" cy="24" r="4" fill="#475569"/>'+
+          '<circle cx="60" cy="36" r="4" fill="#475569"/>'+
+          '<line x1="52" y1="32" x2="60" y2="24" stroke="#475569" stroke-width="2.5"/>'+
+          '<line x1="52" y1="32" x2="60" y2="36" stroke="#475569" stroke-width="2.5"/>'+
+          '<rect x="20" y="50" width="36" height="5" rx="2" fill="#1d4ed8"/>'+
+          '<rect x="10" y="55" width="56" height="5" rx="2" fill="#1d4ed8"/>'+
+        '</svg>'+
+        '<div>'+
+          '<div style="font-size:11px;color:#f97316;font-weight:700;letter-spacing:2px;text-transform:uppercase">ORDEN DE SERVICIO</div>'+
+          '<div style="font-size:22px;font-weight:800;line-height:1.1"><span style="color:#f97316">Innova</span><span style="color:#1d4ed8">com</span></div>'+
+          '<div style="font-size:11px;color:#64748b;margin-top:3px">Fecha de ingreso: '+o.fecha+'</div>'+
+        '</div>'+
+      '</div>'+
+      '<div style="text-align:right">'+
+        '<div class="folio">'+o.id+'</div>'+
+        '<div style="margin-top:8px"><span class="estado-badge">'+o.estado+'</span></div>'+
+      '</div>'+
+    '</div>'+
+    '<div class="section"><div class="section-title">Datos del cliente</div>'+
+    '<div class="grid2">'+
+      '<div><div class="field-lbl">Nombre</div><div class="field-val">'+(c?c.nombre:'-')+'</div></div>'+
+      '<div><div class="field-lbl">Telefono</div><div class="field-val">'+(c?c.telefono:'-')+'</div></div>'+
+      '<div><div class="field-lbl">Correo</div><div class="field-val">'+(c&&c.email?c.email:'-')+'</div></div>'+
+    '</div></div>'+
+    '<div class="section"><div class="section-title">Datos del equipo</div>'+
+    '<div class="grid2">'+
+      '<div><div class="field-lbl">Tipo</div><div class="field-val">'+o.equipo+'</div></div>'+
+      '<div><div class="field-lbl">Marca</div><div class="field-val">'+(o.marca||'-')+'</div></div>'+
+      '<div><div class="field-lbl">Modelo</div><div class="field-val">'+(o.modelo||'-')+'</div></div>'+
+      '<div><div class="field-lbl">No. de serie</div><div class="field-val">'+(o.serie||'-')+'</div></div>'+
+    '</div></div>'+
+    '<div class="section"><div class="section-title">Falla reportada</div>'+
+    '<div class="falla-box">'+(o.falla||'Sin descripcion')+'</div></div>'+
+    (o.diagnostico?'<div class="section"><div class="section-title">Diagnostico tecnico</div><div class="falla-box">'+o.diagnostico+'</div></div>':'')+
+    (o.notas?'<div class="section"><div class="section-title">Observaciones</div><div class="falla-box">'+o.notas+'</div></div>':'')+
+    (repTabla?'<div class="section"><div class="section-title">Repuestos y materiales</div>'+repTabla+'</div>':'')+
+    '<div class="section"><div class="section-title">Resumen de costos</div>'+
+    '<div class="totales">'+
+    (o.repuestos&&o.repuestos.length?'<div class="tot-row"><span>Subtotal repuestos</span><span>'+fmt(o.repuestos.reduce(function(a,p){return a+p.precio*p.qty;},0))+'</span></div>':'')+
+    (o.manoObra?'<div class="tot-row"><span>Mano de obra</span><span>'+fmt(o.manoObra)+'</span></div>':'')+
+    '<div class="tot-row tot-total"><span>TOTAL</span><span>'+fmt(o.costo)+'</span></div>'+
+    '<div class="tot-row" style="color:#10b981"><span>Anticipo recibido</span><span>'+fmt(o.anticipo)+'</span></div>'+
+    '<div class="tot-row" style="font-weight:700;color:'+(saldo>0?'#d97706':'#10b981')+'"><span>Saldo pendiente</span><span>'+fmt(saldo)+'</span></div>'+
+    '</div></div>'+
+    '<div class="firma">'+
+      '<div><div class="firma-line">Firma del cliente</div></div>'+
+      '<div><div class="firma-line">Firma del tecnico</div></div>'+
+    '</div>'+
+    '<div style="margin-top:24px;font-size:10px;color:#94a3b8;text-align:center;border-top:1px solid #e2e8f0;padding-top:12px">'+
+      'Al dejar el equipo en el taller, el cliente acepta los terminos del servicio. Garantia segun acuerdo previo.'+
+    '</div>'+
+    '</body></html>';
+  var win=window.open('','_blank','width=800,height=900');
+  win.document.write(html);
+  win.document.close();
+  win.focus();
+  setTimeout(function(){win.print();},400);
 }
 
 // ── DETALLE ORDEN ─────────────────────────────
