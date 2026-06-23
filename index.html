@@ -262,21 +262,10 @@ nav{margin-top:16px;flex:1}
       <div class="field"><label>No. de serie *</label><input class="inp" id="fo-serie" placeholder="Ej. 5CD1234XYZ"/></div>
       <div class="section-divider"><span>&#128295; Servicio</span></div>
       <div class="field"><label>Falla reportada *</label><textarea class="inp" id="fo-falla" rows="2" placeholder="Descripcion del problema segun el cliente"></textarea></div>
-      <div class="section-divider"><span>&#128230; Repuestos</span></div>
-      <div class="rep-search-wrap">
-        <input class="inp" id="fo-bus-rep" placeholder="Buscar repuesto del inventario..." oninput="buscarRepOrden()" autocomplete="off"/>
-        <div class="rep-dropdown" id="fo-rep-dropdown"></div>
-      </div>
-      <div id="fo-lista-pres"></div>
-      <div class="total-bar">
-        <div><div class="total-bar-label">Subtotal repuestos</div></div>
-        <div class="total-bar-val" id="fo-total-rep">$0.00</div>
-      </div>
-      <div class="section-divider"><span>&#128181; Costos</span></div>
-      <div class="grid3">
-        <div class="field"><label>Mano de obra ($)</label><input class="inp" type="number" id="fo-mano" placeholder="0.00" oninput="recalcTotal()"/></div>
-        <div class="field"><label>Total orden ($)</label><input class="inp" type="number" id="fo-costo" placeholder="0.00"/></div>
-        <div class="field"><label>Anticipo ($)</label><input class="inp" type="number" id="fo-anticipo" placeholder="0.00"/></div>
+      <div class="field"><label>Observaciones</label><textarea class="inp" id="fo-notas" rows="2" placeholder="Accesorios, garantias, etc."></textarea></div>
+      <div class="modal-footer">
+        <button class="btn btn-ghost" onclick="closeModal('modal-orden')">Cancelar</button>
+        <button class="btn btn-primary" id="btn-crear-orden" onclick="guardarOrden()">Crear orden</button>
       </div>
       <div class="field"><label>Observaciones</label><textarea class="inp" id="fo-notas" rows="2" placeholder="Accesorios, garantias, etc."></textarea></div>
       <div class="modal-footer">
@@ -565,14 +554,11 @@ function renderOrdenes(){
 
 // ── MODAL ORDEN ───────────────────────────────
 function openModalOrden(clienteId){
-  presItems=[];
-  ['fo-nombre','fo-telefono','fo-email','fo-equipo','fo-marca','fo-modelo','fo-serie','fo-falla','fo-costo','fo-anticipo','fo-notas','fo-mano'].forEach(function(id){document.getElementById(id).value='';});
+  ['fo-nombre','fo-telefono','fo-email','fo-equipo','fo-marca','fo-modelo','fo-serie','fo-falla','fo-notas'].forEach(function(id){document.getElementById(id).value='';});
   document.getElementById('fo-buscar-cliente').value='';document.getElementById('fo-cliente-id').value='';
   document.getElementById('fo-dropdown').classList.remove('open');
   document.getElementById('fo-cliente-tag').classList.add('hidden');
   document.getElementById('fo-bloque-cliente').style.display='';
-  document.getElementById('fo-bus-rep').value='';
-  renderPresItems();
   if(clienteId){var c=clientes.find(function(x){return x.id===clienteId;});if(c)precargarCliente(c);}
   document.getElementById('modal-orden').classList.remove('hidden');
 }
@@ -647,18 +633,15 @@ function guardarOrden(){
     cp=supaFetch('clientes','POST',nc).then(function(res){var c=Array.isArray(res)?res[0]:res;clientes.unshift(c);clienteId=c.id;return clienteId;});
   }else{cp=Promise.resolve(clienteId);}
   cp.then(function(cid){
-    var sp=presItems.map(function(p){var r=repuestos.find(function(x){return x.id===p.repId;});if(!r)return Promise.resolve();var ns=Math.max(0,r.stock-p.qty);return supaFetch('repuestos?id=eq.'+r.id,'PATCH',{stock:ns}).then(function(){r.stock=ns;});});
-    return Promise.all(sp).then(function(){return cid;});
-  }).then(function(cid){
-    var orden={id:'ORD-'+uid(),fecha:nowDate(),cliente_id:cid,equipo:equipo,marca:document.getElementById('fo-marca').value.trim(),modelo:document.getElementById('fo-modelo').value.trim(),serie:serie,falla:document.getElementById('fo-falla').value.trim(),diagnostico:'',presupuesto:'',trabajo_realizado:'',costo:parseFloat(document.getElementById('fo-costo').value)||0,anticipo:parseFloat(document.getElementById('fo-anticipo').value)||0,mano_obra:parseFloat(document.getElementById('fo-mano').value)||0,notas:document.getElementById('fo-notas').value.trim(),repuestos:presItems.slice(),estado:'Recibido'};
+    var orden={id:'ORD-'+uid(),fecha:nowDate(),cliente_id:cid,equipo:equipo,marca:document.getElementById('fo-marca').value.trim(),modelo:document.getElementById('fo-modelo').value.trim(),serie:serie,falla:document.getElementById('fo-falla').value.trim(),diagnostico:'',presupuesto:'',trabajo_realizado:'',costo:0,anticipo:0,mano_obra:0,notas:document.getElementById('fo-notas').value.trim(),repuestos:[],estado:'Recibido'};
     return supaFetch('ordenes','POST',orden).then(function(res){var o=Array.isArray(res)?res[0]:res;ordenes.unshift(normOrden(o));window._ultimaOrden=normOrden(o);return o;});
   }).then(function(o){
     btn.disabled=false;btn.textContent='Crear orden';
-    closeModal('modal-orden');renderOrdenes();renderClientes();updateFooter();toast('Orden guardada','ok');
+    closeModal('modal-orden');renderOrdenes();renderClientes();updateFooter();toast('Orden creada','ok');
     var cWA=clientes.find(function(x){return x.id===o.cliente_id;});
     var tel=cWA&&cWA.telefono?cWA.telefono.replace(/\D/g,'').replace(/^0/,''):'';
     if(tel){
-      var lineas=['Hola '+cWA.nombre+' !','','Hemos recibido tu equipo en Innovacom.','','OT: '+o.id,'Equipo: '+o.equipo+(o.marca?' '+o.marca:'')+(o.modelo?' '+o.modelo:''),'Serie: '+(o.serie||'-'),'Falla: '+(o.falla||'-'),'Fecha: '+o.fecha,'Costo estimado: '+(o.costo?fmt(o.costo):'Por definir'),'','Gracias por tu confianza - Innovacom'];
+      var lineas=['Hola '+cWA.nombre+' !','','Hemos recibido tu equipo en Innovacom.','','OT: '+o.id,'Equipo: '+o.equipo+(o.marca?' '+o.marca:'')+(o.modelo?' '+o.modelo:''),'Serie: '+(o.serie||'-'),'Falla: '+(o.falla||'-'),'Fecha: '+o.fecha,'','En cuanto tengamos el diagnostico te avisamos. Gracias - Innovacom'];
       var msg=encodeURIComponent(lineas.join('\n'));
       document.getElementById('acc-folio').textContent=o.id;document.getElementById('acc-nombre').textContent=cWA.nombre;
       document.getElementById('wa-link').href='https://wa.me/593'+tel+'?text='+msg;
@@ -700,6 +683,102 @@ function eliminarRepuesto(id){if(!confirm('Eliminar?'))return;supaFetch('repuest
 
 // ── DETALLE ORDEN ─────────────────────────────
 function openDetalle(id){currentDetalleId=id;renderDetalle();document.getElementById('modal-detalle').classList.remove('hidden');}
+
+function buscarRepDetalle(){
+  var q=document.getElementById('det-bus-rep').value.toLowerCase().trim();
+  var dd=document.getElementById('det-rep-dropdown');
+  if(!q){dd.classList.remove('open');return;}
+  var res=repuestos.filter(function(r){return r.stock>0&&(r.nombre.toLowerCase().indexOf(q)>=0||r.categoria.toLowerCase().indexOf(q)>=0);}).slice(0,8);
+  if(!res.length){dd.innerHTML='<div class="rep-opt"><span style="color:#475569">Sin resultados en inventario</span></div>';dd.classList.add('open');return;}
+  dd.innerHTML=res.map(function(r){
+    return '<div class="rep-opt" onclick="agregarRepDetalle(\''+r.id+'\')">'+
+      '<div><div style="font-weight:600;color:#e2e8f0">'+r.nombre+'</div>'+
+      '<div style="font-size:11px;color:#64748b">'+r.categoria+' · Stock: <span class="'+(r.stock<3?'stock-low':'')+'">'+r.stock+'</span></div></div>'+
+      '<div style="text-align:right"><div style="font-weight:700;color:#10b981">'+fmt(r.precio)+'</div><div style="font-size:10px;color:#475569">c/u</div></div></div>';
+  }).join('');
+  dd.classList.add('open');
+}
+
+function agregarRepDetalle(repId){
+  var r=repuestos.find(function(x){return x.id===repId;});if(!r)return;
+  document.getElementById('det-rep-dropdown').classList.remove('open');
+  document.getElementById('det-bus-rep').value='';
+  var o=ordenes.find(function(x){return x.id===currentDetalleId;});if(!o)return;
+  var reps=o.repuestos?o.repuestos.slice():[];
+  var ex=reps.find(function(p){return p.repId===repId;});
+  if(ex){ex.qty++;}else{reps.push({repId:repId,nombre:r.nombre,precio:parseFloat(r.precio)||0,qty:1});}
+  // descontar stock
+  var ns=Math.max(0,r.stock-1);
+  supaFetch('repuestos?id=eq.'+repId,'PATCH',{stock:ns}).then(function(){
+    r.stock=ns;
+    return supaFetch('ordenes?id=eq.'+currentDetalleId,'PATCH',{repuestos:reps});
+  }).then(function(){
+    ordenes=ordenes.map(function(x){return x.id===currentDetalleId?Object.assign({},x,{repuestos:reps}):x;});
+    // recalcular total
+    var o2=ordenes.find(function(x){return x.id===currentDetalleId;});
+    var newTotal=o2.manoObra+calcRepTotal(o2);
+    return supaFetch('ordenes?id=eq.'+currentDetalleId,'PATCH',{costo:newTotal}).then(function(){
+      ordenes=ordenes.map(function(x){return x.id===currentDetalleId?Object.assign({},x,{costo:newTotal}):x;});
+    });
+  }).then(function(){
+    toast('Repuesto agregado','ok');renderDetalle();
+  }).catch(function(){toast('Error al agregar repuesto','err');});
+}
+
+function quitarRepDetalle(idx){
+  var o=ordenes.find(function(x){return x.id===currentDetalleId;});if(!o)return;
+  var reps=o.repuestos?o.repuestos.slice():[];
+  var p=reps[idx];if(!p)return;
+  // devolver stock
+  var r=repuestos.find(function(x){return x.id===p.repId;});
+  var devPromise=r?supaFetch('repuestos?id=eq.'+p.repId,'PATCH',{stock:r.stock+p.qty}).then(function(){r.stock+=p.qty;}):Promise.resolve();
+  reps.splice(idx,1);
+  devPromise.then(function(){
+    return supaFetch('ordenes?id=eq.'+currentDetalleId,'PATCH',{repuestos:reps});
+  }).then(function(){
+    ordenes=ordenes.map(function(x){return x.id===currentDetalleId?Object.assign({},x,{repuestos:reps}):x;});
+    var o2=ordenes.find(function(x){return x.id===currentDetalleId;});
+    var newTotal=o2.manoObra+calcRepTotal(o2);
+    return supaFetch('ordenes?id=eq.'+currentDetalleId,'PATCH',{costo:newTotal}).then(function(){
+      ordenes=ordenes.map(function(x){return x.id===currentDetalleId?Object.assign({},x,{costo:newTotal}):x;});
+    });
+  }).then(function(){
+    toast('Repuesto eliminado','ok');renderDetalle();
+  }).catch(function(){toast('Error al quitar repuesto','err');});
+}
+
+function recalcDetalle(){
+  var o=ordenes.find(function(x){return x.id===currentDetalleId;});if(!o)return;
+  var mano=parseFloat(document.getElementById('det-mano')?document.getElementById('det-mano').value:o.manoObra)||0;
+  var anticipo=parseFloat(document.getElementById('det-anticipo')?document.getElementById('det-anticipo').value:o.anticipo)||0;
+  var repT=calcRepTotal(o);
+  var total=mano+repT;
+  var saldo=total-anticipo;
+  if(document.getElementById('det-show-mano'))document.getElementById('det-show-mano').textContent=fmt(mano);
+  if(document.getElementById('det-show-rep'))document.getElementById('det-show-rep').textContent=fmt(repT);
+  if(document.getElementById('det-show-total'))document.getElementById('det-show-total').textContent=fmt(total);
+  if(document.getElementById('det-show-anticipo'))document.getElementById('det-show-anticipo').textContent=fmt(anticipo);
+  if(document.getElementById('det-show-saldo')){
+    document.getElementById('det-show-saldo').textContent=fmt(saldo);
+    document.getElementById('det-show-saldo').style.color=saldo>0?'#f59e0b':'#10b981';
+  }
+}
+
+function guardarCostos(){
+  var o=ordenes.find(function(x){return x.id===currentDetalleId;});if(!o)return;
+  var mano=parseFloat(document.getElementById('det-mano').value)||0;
+  var anticipo=parseFloat(document.getElementById('det-anticipo').value)||0;
+  var repT=calcRepTotal(o);
+  var total=mano+repT;
+  var patch={mano_obra:mano,anticipo:anticipo,costo:total};
+  supaFetch('ordenes?id=eq.'+currentDetalleId,'PATCH',patch).then(function(){
+    ordenes=ordenes.map(function(x){return x.id===currentDetalleId?Object.assign({},x,{manoObra:mano,anticipo:anticipo,costo:total}):x;});
+    toast('Costos guardados correctamente','ok');
+    if(!document.getElementById('tab-ordenes').classList.contains('hidden'))renderOrdenes();
+    if(!document.getElementById('tab-dashboard').classList.contains('hidden'))renderDashboard();
+    if(!document.getElementById('tab-contabilidad').classList.contains('hidden'))renderContabilidad();
+  }).catch(function(){toast('Error al guardar costos','err');});
+}
 
 function guardarCampo(campo,valor){
   var patch={};
@@ -748,12 +827,20 @@ function renderDetalle(){
     (idxActual>=1&&idxActual<=2?'<textarea id="det-trabajo" class="inp" rows="3" placeholder="Describe el trabajo realizado...">'+(o.trabajoRealizado||'')+'</textarea><button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="guardarCampo(\'trabajoRealizado\',document.getElementById(\'det-trabajo\').value)">Guardar trabajo realizado</button>':
     '<div style="font-size:13px;color:#cbd5e1;line-height:1.6">'+(o.trabajoRealizado||'<span style="color:#475569">No registrado</span>')+'</div>')+'</div>';
 
-  var repHtml='';
-  if(o.repuestos&&o.repuestos.length){
-    repHtml='<div class="detail-box"><div class="detail-label">&#128230; Repuestos utilizados</div>'+
-      o.repuestos.map(function(p){return '<div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #0f2040;font-size:13px"><span style="color:#e2e8f0">'+p.nombre+' x'+p.qty+'</span><span style="color:#10b981;font-weight:700">'+fmt(p.precio*p.qty)+'</span></div>';}).join('')+
-      '</div>';
-  }
+  var repHtml='<div class="detail-box"><div class="detail-label">&#128230; Repuestos utilizados</div>'+
+    (o.repuestos&&o.repuestos.length?
+      o.repuestos.map(function(p,i){return '<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #0f2040;font-size:13px">'+
+        '<span style="color:#e2e8f0">'+p.nombre+' x'+p.qty+'</span>'+
+        '<div style="display:flex;align-items:center;gap:10px">'+
+        '<span style="color:#10b981;font-weight:700">'+fmt(p.precio*p.qty)+'</span>'+
+        (idxActual<=2?'<button style="background:none;border:none;color:#ef4444;cursor:pointer;font-size:14px" onclick="quitarRepDetalle('+i+')">&#10005;</button>':'')+'</div></div>';}).join('')
+      :'<p style="font-size:12px;color:#475569;margin-bottom:8px">No se han agregado repuestos.</p>')+
+    (idxActual<=2?
+      '<div class="rep-search-wrap" style="margin-top:10px">'+
+      '<input class="inp" id="det-bus-rep" placeholder="Agregar repuesto del inventario..." oninput="buscarRepDetalle()" autocomplete="off" style="font-size:12px"/>'+
+      '<div class="rep-dropdown" id="det-rep-dropdown"></div></div>'
+      :'')+
+    '</div>';
 
   var sigEstado=ESTADO_SIGUIENTE[o.estado];
   var estadoHtml='<div class="detail-box"><div class="detail-label">Estado actual</div>'+
@@ -775,12 +862,20 @@ function renderDetalle(){
     '<div style="font-size:15px;font-weight:800;color:#e2e8f0;letter-spacing:1px">'+(o.serie||'No registrado')+'</div></div></div>'+
     fallaHtml+diagHtml+presHtml+trabajoHtml+repHtml+
     '<div class="detail-box"><div class="detail-label">Desglose de costos</div>'+
-    '<div style="display:flex;flex-direction:column;gap:6px;margin-top:4px">'+
-    '<div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:#64748b">Mano de obra</span><span style="color:#f97316;font-weight:700">'+fmt(o.manoObra)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:#64748b">Repuestos</span><span style="color:#60a5fa;font-weight:700">'+fmt(repT)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;font-size:14px;border-top:1px solid #1e293b;padding-top:6px;margin-top:2px"><span style="color:#e2e8f0;font-weight:700">Total</span><span style="color:#10b981;font-weight:800">'+fmt(o.costo)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:#64748b">Anticipo</span><span style="color:#10b981;font-weight:600">'+fmt(o.anticipo)+'</span></div>'+
-    '<div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:#64748b">Saldo pendiente</span><span style="color:'+(saldo>0?'#f59e0b':'#10b981')+';font-weight:700">'+fmt(saldo)+'</span></div>'+
+    '<div style="display:flex;flex-direction:column;gap:8px;margin-top:6px">'+
+    (idxActual<=2?
+      '<div class="grid2">'+
+        '<div class="field"><label>Mano de obra ($)</label><input class="inp" type="number" id="det-mano" value="'+o.manoObra+'" placeholder="0.00" oninput="recalcDetalle()"/></div>'+
+        '<div class="field"><label>Anticipo ($)</label><input class="inp" type="number" id="det-anticipo" value="'+o.anticipo+'" placeholder="0.00" oninput="recalcDetalle()"/></div>'+
+      '</div>':'')+
+    '<div style="background:#0f172a;border:1px solid #1e293b;border-radius:8px;padding:10px 14px">'+
+      '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:#64748b">Mano de obra</span><span style="color:#f97316;font-weight:700" id="det-show-mano">'+fmt(o.manoObra)+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:#64748b">Repuestos</span><span style="color:#60a5fa;font-weight:700" id="det-show-rep">'+fmt(repT)+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:14px;border-top:1px solid #1e293b;padding-top:6px;margin-top:4px"><span style="color:#e2e8f0;font-weight:700">Total</span><span style="color:#10b981;font-weight:800" id="det-show-total">'+fmt(o.costo)+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:#64748b">Anticipo</span><span style="color:#10b981;font-weight:600" id="det-show-anticipo">'+fmt(o.anticipo)+'</span></div>'+
+      '<div style="display:flex;justify-content:space-between;font-size:13px;padding:3px 0"><span style="color:#64748b">Saldo pendiente</span><span style="color:'+(saldo>0?'#f59e0b':'#10b981')+';font-weight:700" id="det-show-saldo">'+fmt(saldo)+'</span></div>'+
+    '</div>'+
+    (idxActual<=2?'<button class="btn btn-primary btn-sm" onclick="guardarCostos()">Guardar costos</button>':'')+
     '</div></div>'+
     estadoHtml+
     '<div style="display:flex;justify-content:space-between;margin-top:4px">'+
