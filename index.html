@@ -303,6 +303,23 @@ nav{margin-top:16px;flex:1}
   </div>
 </div>
 
+<!-- MODAL HISTORIAL CLIENTE -->
+<div class="overlay hidden" id="modal-historial">
+  <div class="modal" style="max-width:680px">
+    <div class="modal-header">
+      <div>
+        <div class="modal-title" id="hist-nombre"></div>
+        <div style="font-size:12px;color:#64748b;margin-top:2px" id="hist-sub"></div>
+      </div>
+      <button class="modal-close" onclick="closeModal('modal-historial')">&#10005;</button>
+    </div>
+    <div class="modal-body">
+      <div class="grid4" id="hist-stats"></div>
+      <div id="hist-lista"></div>
+    </div>
+  </div>
+</div>
+
 <!-- MODAL DETALLE -->
 <div class="overlay hidden" id="modal-detalle">
   <div class="modal" style="max-width:640px">
