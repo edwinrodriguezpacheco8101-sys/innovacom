@@ -544,7 +544,7 @@ function renderOrdenes(){
   document.getElementById('sub-ordenes').textContent=ordenes.length+' en total';
   var div=document.getElementById('lista-ordenes');
   if(!filt.length){div.innerHTML='<p style="color:#334155;font-size:13px">No hay ordenes.</p>';return;}
-  div.innerHTML=filt.map(function(o){var c=clientes.find(function(x){return x.id===o.clienteId;});var falla=o.falla&&o.falla.length>55?o.falla.slice(0,55)+'...':o.falla;return '<div class="orden-card" onclick="openDetalle(\''+o.id+'\')">'+'<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:11px;color:#f97316;font-weight:700">'+o.id+'</span>'+badge(o.estado)+'</div>'+'<div style="font-weight:600;font-size:14px;color:#f1f5f9">'+o.equipo+' '+o.marca+' '+o.modelo+'</div>'+'<div style="font-size:12px;color:#64748b">'+(c?c.nombre:'-')+(o.serie?' · Serie: '+o.serie:'')+(falla?' · '+falla:'')+'</div></div>'+'<div><div style="font-size:14px;font-weight:800;color:#10b981;text-align:right">'+(o.costo?fmt(o.costo):'-')+'</div><div style="font-size:11px;color:#334155;text-align:right">'+o.fecha+'</div></div></div>';}).join('');
+  div.innerHTML=filt.map(function(o){var c=clientes.find(function(x){return x.id===o.clienteId;});var falla=o.falla&&o.falla.length>55?o.falla.slice(0,55)+'...':o.falla;return '<div class="orden-card" onclick="openDetalle(\''+o.id+'\')">'+'<div style="flex:1"><div style="display:flex;align-items:center;gap:8px;margin-bottom:4px"><span style="font-size:11px;color:#f97316;font-weight:700">'+o.id+'</span>'+badge(o.estado)+'</div>'+'<div style="font-weight:600;font-size:14px;color:#f1f5f9">'+o.equipo+' '+o.marca+' '+o.modelo+'</div>'+'<div style="font-size:12px;color:#64748b">'+(c?c.nombre:'-')+(o.serie?' · Serie: '+o.serie:'')+(falla?' · '+falla:'')+'</div></div>'+'<div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px">'+'<div style="font-size:14px;font-weight:800;color:#10b981;text-align:right">'+(o.costo?fmt(o.costo):'-')+'</div>'+'<div style="font-size:11px;color:#334155;text-align:right">'+o.fecha+'</div>'+(o.estado==='Entregado'?'<button class="btn btn-sm" style="background:#6366f122;color:#818cf8;border:1px solid #6366f144;white-space:nowrap" onclick="event.stopPropagation();imprimirInformeTecnicoById(\''+o.id+'\')">&#128196; Informe Tecnico</button>':'')+'</div></div>';}).join('');
 }
 
 // ── MODAL ORDEN ───────────────────────────────
@@ -908,6 +908,11 @@ function cambiarEstado(estado){
       setTimeout(function(){closeModal('modal-detalle');document.getElementById('modal-informe').classList.remove('hidden');},300);
     }
   }).catch(function(){toast('Error al actualizar','err');});
+}
+
+function imprimirInformeTecnicoById(id){
+  currentDetalleId=id;
+  imprimirInformeTecnico();
 }
 
 function imprimirInformeTecnico(){
