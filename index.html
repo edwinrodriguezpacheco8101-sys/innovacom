@@ -528,8 +528,76 @@ function renderClientes(){
   document.getElementById('sub-clientes').textContent=clientes.length+' registrados';
   var div=document.getElementById('lista-clientes');
   if(!filt.length){div.innerHTML='<p style="color:#334155;font-size:13px">No se encontraron clientes.</p>';return;}
-  div.innerHTML=filt.map(function(c){var ords=ordenes.filter(function(o){return o.clienteId===c.id;}).length;return '<div class="cliente-card"><div class="avatar">'+c.nombre[0].toUpperCase()+'</div><div style="flex:1"><div style="font-weight:700;font-size:15px;color:#f1f5f9">'+c.nombre+'</div><div style="font-size:12px;color:#64748b">'+(c.telefono||'')+((c.email)?' · '+c.email:'')+'</div><div style="font-size:11px;color:#334155">'+ords+' orden'+(ords!==1?'es':'')+' · Desde '+c.fecha+'</div></div><div style="display:flex;gap:8px;margin-left:auto"><button class="btn btn-ghost btn-sm" onclick="openModalOrden(\''+c.id+'\')">+ Orden</button><button class="btn btn-danger btn-sm" onclick="eliminarCliente(\''+c.id+'\')">Borrar</button></div></div>';}).join('');
+  div.innerHTML=filt.map(function(c){
+    var ords=ordenes.filter(function(o){return o.clienteId===c.id;});
+    var total=ords.filter(function(o){return o.estado==='Entregado';}).reduce(function(a,o){return a+o.costo;},0);
+    return '<div class="cliente-card"><div class="avatar">'+c.nombre[0].toUpperCase()+'</div>'+
+      '<div style="flex:1">'+
+        '<div style="font-weight:700;font-size:15px;color:#f1f5f9">'+c.nombre+'</div>'+
+        '<div style="font-size:12px;color:#64748b">'+(c.telefono||'')+((c.email)?' · '+c.email:'')+'</div>'+
+        '<div style="font-size:11px;color:#334155">'+ords.length+' orden'+(ords.length!==1?'es':'')+' · Total cobrado: '+fmt(total)+' · Desde '+c.fecha+'</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:8px;margin-left:auto">'+
+        '<button class="btn btn-sm" style="background:#6366f122;color:#818cf8;border:1px solid #6366f144" onclick="verHistorial(\''+c.id+'\')">&#128203; Historial</button>'+
+        '<button class="btn btn-ghost btn-sm" onclick="openModalOrden(\''+c.id+'\')">+ Orden</button>'+
+        '<button class="btn btn-danger btn-sm" onclick="eliminarCliente(\''+c.id+'\')">Borrar</button>'+
+      '</div></div>';
+  }).join('');
 }
+
+function verHistorial(clienteId){
+  var c=clientes.find(function(x){return x.id===clienteId;});
+  if(!c)return;
+  var ords=ordenes.filter(function(o){return o.clienteId===clienteId;});
+  var entregadas=ords.filter(function(o){return o.estado==='Entregado';});
+  var enProceso=ords.filter(function(o){return ['Recibido','En proceso','Listo'].indexOf(o.estado)>=0;});
+  var totalCobrado=entregadas.reduce(function(a,o){return a+o.costo;},0);
+
+  document.getElementById('hist-nombre').textContent='Historial de '+c.nombre;
+  document.getElementById('hist-sub').textContent=(c.telefono||'')+(c.email?' · '+c.email:'');
+
+  // Stats
+  document.getElementById('hist-stats').innerHTML=
+    '<div class="stat-card" style="border:1px solid #f9731633"><div class="stat-val" style="color:#f97316;font-size:18px">'+ords.length+'</div><div class="stat-label">Total OTs</div></div>'+
+    '<div class="stat-card" style="border:1px solid #10b98133"><div class="stat-val" style="color:#10b981;font-size:18px">'+fmt(totalCobrado)+'</div><div class="stat-label">Total cobrado</div></div>'+
+    '<div class="stat-card" style="border:1px solid #6366f133"><div class="stat-val" style="color:#6366f1;font-size:18px">'+entregadas.length+'</div><div class="stat-label">Entregadas</div></div>'+
+    '<div class="stat-card" style="border:1px solid #f59e0b33"><div class="stat-val" style="color:#f59e0b;font-size:18px">'+enProceso.length+'</div><div class="stat-label">En proceso</div></div>';
+
+  // Lista OTs
+  var div=document.getElementById('hist-lista');
+  if(!ords.length){div.innerHTML='<p style="color:#334155;font-size:13px">Este cliente no tiene ordenes registradas.</p>';document.getElementById('modal-historial').classList.remove('hidden');return;}
+
+  div.innerHTML=ords.map(function(o){
+    var repT=calcRepTotal(o);
+    return '<div style="background:#020817;border:1px solid #1e293b;border-radius:10px;padding:14px 16px;margin-bottom:8px;cursor:pointer" onclick="closeModal(\'modal-historial\');openDetalle(\''+o.id+'\')">'+
+      '<div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8px">'+
+        '<div>'+
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:4px">'+
+            '<span style="font-size:11px;color:#f97316;font-weight:700">'+o.id+'</span>'+
+            badge(o.estado)+
+          '</div>'+
+          '<div style="font-weight:600;font-size:14px;color:#f1f5f9">'+o.equipo+' '+o.marca+' '+o.modelo+'</div>'+
+          '<div style="font-size:11px;color:#64748b;margin-top:2px">Serie: '+(o.serie||'-')+' · '+o.fecha+'</div>'+
+        '</div>'+
+        '<div style="text-align:right">'+
+          '<div style="font-size:15px;font-weight:800;color:#10b981">'+fmt(o.costo)+'</div>'+
+          (o.estado==='Entregado'?'<button class="btn btn-sm" style="background:#6366f122;color:#818cf8;border:1px solid #6366f144;margin-top:4px" onclick="event.stopPropagation();imprimirInformeTecnicoById(\''+o.id+'\')">&#128196; Informe</button>':'')+
+        '</div>'+
+      '</div>'+
+      '<div style="display:flex;gap:16px;flex-wrap:wrap">'+
+        (o.falla?'<div style="font-size:12px;color:#64748b"><span style="color:#475569">Falla:</span> '+o.falla.slice(0,60)+(o.falla.length>60?'...':'')+'</div>':'')+
+      '</div>'+
+      '<div style="display:flex;gap:16px;margin-top:6px">'+
+        '<span style="font-size:11px;color:#f97316">Mano de obra: '+fmt(o.manoObra)+'</span>'+
+        '<span style="font-size:11px;color:#60a5fa">Repuestos: '+fmt(repT)+'</span>'+
+      '</div>'+
+    '</div>';
+  }).join('');
+
+  document.getElementById('modal-historial').classList.remove('hidden');
+}
+
+function verHistorialClose(){closeModal('modal-historial');}
 
 function eliminarCliente(id){
   if(!confirm('Eliminar este cliente?'))return;
